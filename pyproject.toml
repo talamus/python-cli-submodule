@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "python-cli-submodule"
+version = "0.0.0"
+description = "Python submodule to speed up CLI creation. Handles screen output and log file rotation."
+authors = ["Tero Niemi <talamus@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "some_module"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+platformdirs = "^3.11.0"
+pyyaml = "^6.0.1"
+colorama = "^0.4.6"
+python-json-logger = "^2.0.7"
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.10.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
