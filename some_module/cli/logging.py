@@ -122,7 +122,11 @@ def set_up_loggers(cfg: dict[str, Any] = None) -> None:
                     backupCount=cfg["log_max_files"],
                 )
 
-            _file_logging_handler.setFormatter(jsonlogger.JsonFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+            _file_logging_handler.setFormatter(
+                jsonlogger.JsonFormatter(
+                    "%(asctime)s %(levelname)s %(name)s %(message)s"
+                )
+            )
             logger.addHandler(_file_logging_handler)
 
         if "log_level" in cfg and cfg["log_level"]:
