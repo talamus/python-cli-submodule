@@ -85,7 +85,7 @@ def set_up_loggers(cfg: dict[str, Any] = None) -> None:
     global _file_logging_handler
 
     if cfg is None:
-        cfg = {"verbosity": "ERROR", "log_file": None}
+        cfg = {"verbosity": "ERROR"}
 
     # Each handler handles the filtering
     logger = logging.getLogger()
