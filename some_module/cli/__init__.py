@@ -1,2 +1,2 @@
 from .main import main
-from .logging import *
+from .logging import VERBOSITY
