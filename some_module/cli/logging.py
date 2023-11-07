@@ -9,6 +9,8 @@ from typing import Any
 from colorama import Fore, Style
 from pythonjsonlogger import jsonlogger
 
+LOG_FILE_FORMAT = "%(asctime)s %(levelname)s %(name)s %(message)s"
+
 VERBOSITY = {
     "NONE": logging.CRITICAL,
     "ERROR": logging.ERROR,
@@ -20,67 +22,90 @@ _screen_logging_handler = None
 _file_logging_handler = None
 
 
-class ScreenFormatter(logging.Formatter):
-    """A screen friendly version of the log record."""
+class ScreenFormatter(jsonlogger.JsonFormatter):
+    """A screen friendly version of the log formatter."""
 
-    level_colors = (
-        Style.BRIGHT + Fore.WHITE,  # NOTSET=0
-        Style.BRIGHT + Fore.CYAN,  # DEBUG=10
-        Style.BRIGHT + Fore.GREEN,  # INFO=20
-        Style.BRIGHT + Fore.YELLOW,  # WARN=30
-        Style.BRIGHT + Fore.RED,  # ERROR=40
-        Style.BRIGHT + Fore.MAGENTA,  # CRITICAL=50
-    )
-    additional_info_color = Fore.LIGHTWHITE_EX
+    level_colors = {
+        "DEBUG": Style.BRIGHT + Fore.CYAN,
+        "INFO": Style.BRIGHT + Fore.GREEN,
+        "WARN": Style.BRIGHT + Fore.YELLOW,
+        "ERROR": Style.BRIGHT + Fore.RED,
+        "CRITICAL": Style.BRIGHT + Fore.MAGENTA,
+    }
+    argument_color = Fore.LIGHTWHITE_EX
+    extra_fields_color = Fore.LIGHTWHITE_EX
     reset_colors = Style.RESET_ALL
 
     def __init__(self, *args, **kwargs):
         # Disable colors if stdout is being redirected
         if not sys.stdout.isatty():
-            ScreenFormatter.level_colors = (
-                "[!!!]   ",
-                "[DEBUG] ",
-                "[INFO]  ",
-                "[WARNING] ",
-                "[ERROR] ",
-                "[CRITICAL] ",
-            )
-            ScreenFormatter.additional_info_color = ""
+            ScreenFormatter.level_colors = {
+                "DEBUG": "[DEBUG] ",
+                "INFO": "[INFO]  ",
+                "WARN": "[WARNING] ",
+                "ERROR": "[ERROR] ",
+                "CRITICAL": "[CRITICAL] ",
+            }
+            ScreenFormatter.argument_color = ""
+            ScreenFormatter.extra_fields_color = ""
             ScreenFormatter.reset_colors = ""
         super().__init__(*args, **kwargs)
 
-    def format(self, record):
-        level = record.levelno // 10
-        level = level if level < len(ScreenFormatter.level_colors) else 0
-        level_color = ScreenFormatter.level_colors[level]
+    def jsonify_log_record(self, log_record):
+        """We are piggybacking the JsonFormatter to easily get the extra fields..."""
+        levelname = log_record.pop("levelname")
+        message = log_record.pop("message")
+        if "exc_info" in log_record:
+            del log_record["exc_info"]
 
-        args = record.args
-        args = args if isinstance(args, tuple) else [args]
+        def format_extra_field(name, value):
+            if not isinstance(value, str):
+                value = pprint.pformat(value, sort_dicts=False)
+            value = textwrap.indent(value, (len(name) + 2) * " ").strip()
+            return textwrap.indent(f"{name}: {value}", "  ") + "\n"
 
-        msg = str(record.msg)
-        additional_info = ""
-        # Wrap and print the final argument beautifully
-        if msg.endswith(" %s"):
-            info = args[-1]
-            args = args[:-1]
-            msg = msg[:-3]
-            wrapped_info = (
-                "\n".join(textwrap.wrap(info))
-                if isinstance(info, str)
-                else pprint.pformat(info)
-            )
-            additional_info = (
+        extra_fields = []
+        for key, value in log_record.items():
+            extra_fields.append(format_extra_field(key, value))
+
+        stringified_extra_fields = ""
+        if extra_fields:
+            stringified_extra_fields = (
                 "\n\n"
-                + ScreenFormatter.additional_info_color
-                + textwrap.indent(wrapped_info, "  ")
+                + ScreenFormatter.extra_fields_color
+                + "\n".join(extra_fields)
                 + ScreenFormatter.reset_colors
-                + "\n"
             )
 
-        return level_color + msg % args + ScreenFormatter.reset_colors + additional_info
+        return (
+            ScreenFormatter.level_colors[levelname]
+            + message
+            + (":" if stringified_extra_fields else "")
+            + ScreenFormatter.reset_colors
+            + stringified_extra_fields
+        )
+
+    def format(self, record):
+        """Formatting a record. Highlighting possible arguments."""
+        record = logging.makeLogRecord(vars(record))
+        record.msg = record.msg.replace(
+            "%s",
+            ScreenFormatter.reset_colors
+            + ScreenFormatter.argument_color
+            + "%s"
+            + ScreenFormatter.reset_colors
+            + ScreenFormatter.level_colors[record.levelname],
+        )
+        return super().format(record)
 
 
 def set_up_loggers(cfg: dict[str, Any] = None) -> None:
+    """
+    Initialize loggers according to the configuration.
+
+    If no configuration is provided, an error logging cabable
+    screen logger is initialized.
+    """
     global _screen_logging_handler
     global _file_logging_handler
 
@@ -94,7 +119,9 @@ def set_up_loggers(cfg: dict[str, Any] = None) -> None:
     # Screen output (a.k.a Verbosity/Quiet)
     if not _screen_logging_handler:
         _screen_logging_handler = logging.StreamHandler(sys.stdout)
-        _screen_logging_handler.setFormatter(ScreenFormatter())
+        _screen_logging_handler.setFormatter(
+            ScreenFormatter("%(levelname)s %(message)s")
+        )
         logger.addHandler(_screen_logging_handler)
 
     _screen_logging_handler.setLevel(VERBOSITY[cfg["verbosity"]])
@@ -123,9 +150,7 @@ def set_up_loggers(cfg: dict[str, Any] = None) -> None:
                 )
 
             _file_logging_handler.setFormatter(
-                jsonlogger.JsonFormatter(
-                    "%(asctime)s %(levelname)s %(name)s %(message)s"
-                )
+                jsonlogger.JsonFormatter(cfg["log_file_format"])
             )
             logger.addHandler(_file_logging_handler)
 

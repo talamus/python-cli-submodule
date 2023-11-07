@@ -6,7 +6,7 @@ import yaml
 import platformdirs
 
 from .cli import main, VERBOSITY
-from . import DEFAULT_CONFIG, some_code as program
+from . import DEFAULT_CONFIG, some_code
 
 # -----------------------------------------------------------------------------
 
@@ -18,6 +18,7 @@ APP_CONFIG = {
     ),
     "verbosity": "ERROR",
     "log_file": os.path.join(platformdirs.user_log_dir(APP_NAME), f"{APP_NAME}.log"),
+    "log_file_format": "%(asctime)s %(levelname)s %(name)s %(message)s",
     "log_level": "INFO",
     "log_max_bytes": 100 * 1024,
     "log_max_files": 10,
@@ -86,4 +87,4 @@ if not args["log_level"]:
 if not args["dryrun"]:
     del args["dryrun"]
 
-sys.exit(main(program, args, cfg, f"Starting {APP_NAME}..."))
+sys.exit(main(lambda cfg: some_code(cfg=cfg), args, cfg, f"Starting {APP_NAME}..."))

@@ -34,11 +34,11 @@ def main(
 
         # Run the application
         log.info(start_message)
-        log.debug("Command line arguments: %s", sys.argv)
+        log.debug("Command line arguments", extra={"raw": sys.argv, "parsed": args})
         program(cfg)
 
     except Exception as error:
-        log.exception("An error occurred: %s", str(error))
+        log.exception(error.__class__.__name__, extra={"problem": str(error)})
 
         # Raise the exception to the terminal when debugging
         if cfg["verbosity"] == "DEBUG" or args["verbosity"] == "DEBUG":
