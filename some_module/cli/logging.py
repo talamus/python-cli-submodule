@@ -25,6 +25,14 @@ _file_logging_handler = None
 class ScreenFormatter(jsonlogger.JsonFormatter):
     """A screen friendly version of the log formatter."""
 
+    level_headers = {
+        "DEBUG": "",
+        "INFO": "",
+        "WARN": "",
+        "ERROR": "",
+        "CRITICAL": "",
+    }
+
     level_colors = {
         "DEBUG": Style.BRIGHT + Fore.CYAN,
         "INFO": Style.BRIGHT + Fore.GREEN,
@@ -39,7 +47,8 @@ class ScreenFormatter(jsonlogger.JsonFormatter):
     def __init__(self, *args, **kwargs):
         # Disable colors if stdout is being redirected
         if not sys.stdout.isatty():
-            ScreenFormatter.level_colors = {
+            ScreenFormatter.level_colors = ScreenFormatter.level_headers
+            ScreenFormatter.level_headers = {
                 "DEBUG": "[DEBUG] ",
                 "INFO": "[INFO]  ",
                 "WARN": "[WARNING] ",
@@ -78,7 +87,8 @@ class ScreenFormatter(jsonlogger.JsonFormatter):
             )
 
         return (
-            ScreenFormatter.level_colors[levelname]
+            ScreenFormatter.level_headers[levelname]
+            + ScreenFormatter.level_colors[levelname]
             + message
             + (":" if stringified_extra_fields else "")
             + ScreenFormatter.reset_colors
