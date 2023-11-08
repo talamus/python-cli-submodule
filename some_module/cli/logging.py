@@ -9,14 +9,51 @@ from typing import Any
 from colorama import Fore, Style
 from pythonjsonlogger import jsonlogger
 
-LOG_FILE_FORMAT = "%(asctime)s %(levelname)s %(name)s %(message)s"
-
 VERBOSITY = {
     "NONE": logging.CRITICAL,
     "ERROR": logging.ERROR,
     "INFO": logging.INFO,
     "DEBUG": logging.DEBUG,
 }
+
+# Headers and colors when printing directly to a terminal
+TTY_LEVEL_HEADERS = {
+    "DEBUG": "",
+    "INFO": "",
+    "WARN": "",
+    "ERROR": "",
+    "CRITICAL": "",
+}
+TTY_LEVEL_COLORS = {
+    "DEBUG": Style.BRIGHT + Fore.CYAN,
+    "INFO": Style.BRIGHT + Fore.GREEN,
+    "WARN": Style.BRIGHT + Fore.YELLOW,
+    "ERROR": Style.BRIGHT + Fore.RED,
+    "CRITICAL": Style.BRIGHT + Fore.MAGENTA,
+}
+TTY_ARGUMENT_COLOR = Fore.LIGHTWHITE_EX
+TTY_EXTRA_FIELDS_COLOR = Fore.LIGHTWHITE_EX
+TTY_RESET_COLORS = Style.RESET_ALL
+
+# Headers and colors when `stdout` is being redirected
+REDIRECTED_LEVEL_HEADERS = {
+    "DEBUG": "[DEBUG] ",
+    "INFO": "[INFO]  ",
+    "WARN": "[WARNING] ",
+    "ERROR": "[ERROR] ",
+    "CRITICAL": "[CRITICAL] ",
+}
+REDIRECTED_LEVEL_COLORS = {
+    "DEBUG": "",
+    "INFO": "",
+    "WARN": "",
+    "ERROR": "",
+    "CRITICAL": "",
+}
+REDIRECTED_ARGUMENT_COLOR = ""
+REDIRECTED_EXTRA_FIELDS_COLOR = ""
+REDIRECTED_RESET_COLORS = ""
+
 
 _screen_logging_handler = None
 _file_logging_handler = None
@@ -25,39 +62,19 @@ _file_logging_handler = None
 class ScreenFormatter(jsonlogger.JsonFormatter):
     """A screen friendly version of the log formatter."""
 
-    level_headers = {
-        "DEBUG": "",
-        "INFO": "",
-        "WARN": "",
-        "ERROR": "",
-        "CRITICAL": "",
-    }
-
-    level_colors = {
-        "DEBUG": Style.BRIGHT + Fore.CYAN,
-        "INFO": Style.BRIGHT + Fore.GREEN,
-        "WARN": Style.BRIGHT + Fore.YELLOW,
-        "ERROR": Style.BRIGHT + Fore.RED,
-        "CRITICAL": Style.BRIGHT + Fore.MAGENTA,
-    }
-    argument_color = Fore.LIGHTWHITE_EX
-    extra_fields_color = Fore.LIGHTWHITE_EX
-    reset_colors = Style.RESET_ALL
-
     def __init__(self, *args, **kwargs):
-        # Disable colors if stdout is being redirected
-        if not sys.stdout.isatty():
-            ScreenFormatter.level_colors = ScreenFormatter.level_headers
-            ScreenFormatter.level_headers = {
-                "DEBUG": "[DEBUG] ",
-                "INFO": "[INFO]  ",
-                "WARN": "[WARNING] ",
-                "ERROR": "[ERROR] ",
-                "CRITICAL": "[CRITICAL] ",
-            }
-            ScreenFormatter.argument_color = ""
-            ScreenFormatter.extra_fields_color = ""
-            ScreenFormatter.reset_colors = ""
+        if sys.stdout.isatty():
+            self.LEVEL_HEADERS = TTY_LEVEL_HEADERS
+            self.LEVEL_COLORS = TTY_LEVEL_COLORS
+            self.ARGUMENT_COLOR = TTY_ARGUMENT_COLOR
+            self.EXTRA_FIELDS_COLOR = TTY_EXTRA_FIELDS_COLOR
+            self.RESET_COLORS = TTY_RESET_COLORS
+        else:
+            self.LEVEL_HEADERS = REDIRECTED_LEVEL_HEADERS
+            self.LEVEL_COLORS = REDIRECTED_LEVEL_COLORS
+            self.ARGUMENT_COLOR = REDIRECTED_ARGUMENT_COLOR
+            self.EXTRA_FIELDS_COLOR = REDIRECTED_EXTRA_FIELDS_COLOR
+            self.RESET_COLORS = REDIRECTED_RESET_COLORS
         super().__init__(*args, **kwargs)
 
     def jsonify_log_record(self, log_record):
@@ -81,17 +98,17 @@ class ScreenFormatter(jsonlogger.JsonFormatter):
         if extra_fields:
             stringified_extra_fields = (
                 "\n\n"
-                + ScreenFormatter.extra_fields_color
+                + self.EXTRA_FIELDS_COLOR
                 + "\n".join(extra_fields)
-                + ScreenFormatter.reset_colors
+                + self.RESET_COLORS
             )
 
         return (
-            ScreenFormatter.level_headers[levelname]
-            + ScreenFormatter.level_colors[levelname]
+            self.LEVEL_HEADERS[levelname]
+            + self.LEVEL_COLORS[levelname]
             + message
             + (":" if stringified_extra_fields else "")
-            + ScreenFormatter.reset_colors
+            + self.RESET_COLORS
             + stringified_extra_fields
         )
 
@@ -100,11 +117,11 @@ class ScreenFormatter(jsonlogger.JsonFormatter):
         record = logging.makeLogRecord(vars(record))
         record.msg = record.msg.replace(
             "%s",
-            ScreenFormatter.reset_colors
-            + ScreenFormatter.argument_color
+            self.RESET_COLORS
+            + self.ARGUMENT_COLOR
             + "%s"
-            + ScreenFormatter.reset_colors
-            + ScreenFormatter.level_colors[record.levelname],
+            + self.RESET_COLORS
+            + self.LEVEL_COLORS[record.levelname],
         )
         return super().format(record)
 
@@ -119,10 +136,10 @@ def set_up_loggers(cfg: dict[str, Any] = None) -> None:
     global _screen_logging_handler
     global _file_logging_handler
 
-    if cfg is None:
-        cfg = {"verbosity": "ERROR"}
+    # Default configuration
+    cfg = cfg or {"verbosity": "ERROR"}
 
-    # Each handler handles the filtering
+    # Each handler handles the filtering separately
     logger = logging.getLogger()
     logger.setLevel(logging.NOTSET)
 
